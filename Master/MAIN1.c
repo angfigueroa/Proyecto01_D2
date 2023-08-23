@@ -6,7 +6,7 @@
  */
 
 // CONFIG1
-#pragma config FOSC = EXTRC_NOCLKOUT// Oscillator Selection bits (RCIO oscillator: I/O function on RA6/OSC2/CLKOUT pin, RC on RA7/OSC1/CLKIN)
+#pragma config FOSC = INTRC_NOCLKOUT// Oscillator Selection bits (RCIO oscillator: I/O function on RA6/OSC2/CLKOUT pin, RC on RA7/OSC1/CLKIN)
 #pragma config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
 #pragma config PWRTE = OFF      // Power-up Timer Enable bit (PWRT disabled)
 #pragma config MCLRE = OFF      // RE3/MCLR pin function select bit (RE3/MCLR pin function is digital input, MCLR internally tied to VDD)
@@ -21,7 +21,7 @@
 #pragma config BOR4V = BOR40V   // Brown-out Reset Selection bit (Brown-out Reset set to 4.0V)
 #pragma config WRT = OFF        // Flash Program Memory Self Write Enable bits (Write protection off)
 
-//Librer韆s
+//Librer铆as
 #include <xc.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -29,8 +29,9 @@
 #include "LCD.h"
 #define S_Term PORTBbits.RB2
 
-//Definici髇 de variables
+//Definici贸n de variables
 #define _XTAL_FREQ (8000000)
+
 
 //Variables
 uint8_t termometro;
@@ -40,7 +41,9 @@ uint8_t uniTV;
 uint8_t decTV;
 uint8_t cenTV;
 uint8_t temp;
-
+int contador;
+int ADC;
+int in;
 //Prototipos
 void setup(void);
 void main(void);
@@ -48,8 +51,6 @@ void main(void);
 //Loop
 void main(void) {
     setup();
-    Lcd_Init();
-    Lcd_Clear();
     while(1){
         S_Term = 0; //Slave select del termometro
         __delay_ms(5);
@@ -124,8 +125,11 @@ void main(void) {
 //Funciones
 //Setup General
 void setup(void){
+    
     //Oscilador
-    //OSCCON = 0B01110001;               //Oscilador a 8Mhz
+    OSCCON = 0B01110001;               //Oscilador a 8Mhz
+    //ADC
+    //conf_ch(0);
     //Entradas y salidas
     ANSEL = 0;
     ANSELH = 0;
@@ -137,9 +141,32 @@ void setup(void){
     PORTB = 0;
     PORTD = 0;
     S_Term = 1;
+    Lcd_Init();
+    Lcd_Clear();
+    Lcd_Set_Cursor(1, 13);
+    Lcd_Write_String("HOLA");
     spiInit(SPI_MASTER_OSC_DIV4, SPI_DATA_SAMPLE_MIDDLE, SPI_CLOCK_IDLE_LOW, SPI_IDLE_2_ACTIVE);
       
 }
 
+//Interrupcion
+void __interrupt() isr(void) {
+    /*if (PIR1bits.ADIF){
+        ADC = conf_ch();
+    }*/
+    if (SSPIF == 1){// Verifica si la interrupci贸n es del m贸dulo SPI
+        in = spiRead();// Lee los datos recibidos por SPI
+        if (in == 0){
+            spiWrite(ADC);// Env铆a el valor del ADC por SPI si se recibe un 0
+        }
+        else if (in == 1){
+            spiWrite(contador);// Env铆a el valor del contador por SPI si se recibe un 1
+        }
+    }
+    INTCONbits.RBIF = 0;   //Limpia la bandera de interrupci贸n
+    PIR1bits.ADIF = 0;// Limpia la bandera de interrupci贸n del ADC
+    SSPIF = 0;// Limpia la bandera de interrupci贸n del m贸dulo SPI
+}
 
+  
 
